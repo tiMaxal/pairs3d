@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.env/
+.venv/
+env/
+venv/
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.deb
+Makefile
+
+# PyInstaller
+*.spec
+
+# Executables
+*.exe
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+
+# macOS, Linux, Windows junk
+.DS_Store
+Thumbs.db
+
+# VS Code / PyCharm settings
+.vscode/
+.idea/
+
+# todo
+todo.md
