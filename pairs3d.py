@@ -140,33 +140,68 @@ def sort_images(folder):
 
 def main():
     """
-    Launch the Tkinter GUI for selecting a folder and sorting images.
+    Launch the Tkinter GUI for selecting a folder and sorting stereo image pairs.
+
+    The interface provides:
+    - A label to prompt folder selection.
+    - A 'Browse' button to choose a directory containing image files.
+    - A label to display the selected folder path.
+    - A 'Start' button to commence sorting after a folder is selected.
+    - A listbox to display the result counts for pairs and singles.
     """
     root = Tk()
     root.title("pairs3d - Stereo Image Sorter")
+
+    # Store selected folder path using a mutable object
+    selected_folder = {"path": None}
+
+    # Prompt text
     label = Label(root, text="Select a folder containing images to sort:")
     label.pack(pady=10)
+
+    # Display selected folder (initially none)
     label_selected_folder = Label(root, text="No folder selected", fg="gray")
     label_selected_folder.pack()
+
+    # Display results
     listbox_results = Listbox(root, width=40)
     listbox_results.pack(pady=10)
 
     def browse_folder():
         """
-        Handle folder selection, sorting, and displaying results in the GUI.
+        Handle folder selection via file dialog and update the UI.
+        Does not perform sorting; only sets the selected folder.
         """
         folder = filedialog.askdirectory()
+        if folder:
+            selected_folder["path"] = folder
+            label_selected_folder.config(text=folder, fg="black")
+            listbox_results.delete(0, END)
+
+    def start_sorting():
+        """
+        Perform image sorting using the selected folder.
+        Moves paired and single images into separate subfolders.
+        Displays the result in the listbox and alerts completion.
+        """
+        folder = selected_folder["path"]
         if not folder:
+            messagebox.showwarning("No Folder", "Please select a folder first.")
             return
-        label_selected_folder.config(text=folder)
         pairs, singles = sort_images(folder)
         listbox_results.delete(0, END)
         listbox_results.insert(END, f"Pairs moved: {pairs}")
         listbox_results.insert(END, f"Singles moved: {singles}")
         messagebox.showinfo("Done", f"Sorted {pairs} pairs and {singles} singles.")
 
+    # Folder selection button
     button_browse = Button(root, text="Browse", command=browse_folder)
     button_browse.pack(pady=5)
+
+    # Start sorting button
+    button_start = Button(root, text="Start", command=start_sorting)
+    button_start.pack(pady=5)
+
     root.mainloop()
 
 
