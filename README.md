@@ -4,9 +4,9 @@
   __pairs3d__
 Stereo Image Pair Sorter
  [created by chatgpt vibe-code]
- separate stereo pairs, and single images, from one folder
+ separate stereo "cha-cha" pairs, and single images, from one folder
  
-`pairs3d` is a basic python GUI tool that automatically identifies and separates stereo image pairs from folders containing both stereo pairs and single images. It uses perceptual hashing and timestamp proximity to detect stereo pairs and organizes them into separate folders for easy management.
+`pairs3d` is a basic python GUI tool that automatically identifies and separates stereo image pairs from folders containing both stereo pairs and single images. It uses perceptual hashing and timestamp proximity to detect stereo pairs and organizes them into separate pair/single folders for easy management.
 
  __Features__
 Detects stereo image pairs based on:
