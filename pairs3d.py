@@ -7,6 +7,15 @@ Pairs are moved into a 'pairs' subfolder, and unpaired images into a 'singles' s
 A simple Tkinter GUI allows users to select a folder and view results.
 """
 
+
+"""
+original ai prompt [20250624]:
+
+ a way to separate pairs from folders also containing singles .. software that compares for image-similarity and closeness of time-created
+
+"""
+
+
 import os
 import shutil
 from tkinter import filedialog, messagebox, Tk, Label, Button, Listbox, END
