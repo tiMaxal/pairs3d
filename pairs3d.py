@@ -5,7 +5,6 @@ A utility for sorting stereo image pairs in a folder.
 Pairs are detected based on file modification timestamps and perceptual image similarity.
 Pairs are moved into a 'pairs' subfolder, and unpaired images into a 'singles' subfolder.
 A simple Tkinter GUI allows users to select a folder and view results.
-"""
 
     =====
 
@@ -13,7 +12,6 @@ original ai prompt [20250624]:
 
  a way to separate pairs from folders also containing singles .. software that compares for image-similarity and closeness of time-created
 
- 
 """
 
 
