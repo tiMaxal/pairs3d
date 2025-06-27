@@ -1,6 +1,6 @@
 to do:
 - [done] `start` button
-- progress bar
+- [done] progress bar
 - Cross-platform support: Windows and Linux
 
 
