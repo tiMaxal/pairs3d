@@ -150,7 +150,6 @@ def sort_images(folder, progress_callback=None):
 def main():
     """
     Launch the Tkinter GUI for selecting a folder and sorting stereo image pairs.
-
     The interface provides:
     - A label to prompt folder selection.
     - A 'Browse' button to choose a directory containing image files.
@@ -158,8 +157,7 @@ def main():
     - A 'Start' button to commence sorting after a folder is selected.
     - A listbox to display the result counts for pairs and singles.
     - A progress bar that updates as image pairs are processed.
-    - Elapsed time and estimated time remaining are displayed.
-
+    - Elapsed time (left), processed count (right), and estimated time remaining (left, below elapsed) and total file count (right, below processed) are displayed.
     """
     root = Tk()
     root.title("pairs3d - Stereo Image Sorter")
@@ -179,24 +177,46 @@ def main():
     listbox_results = Listbox(root, width=40)
     listbox_results.pack(pady=10)
 
+    """
+     orig, to keep progress bar separate from time\filecount:
     progress = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
     progress.pack(pady=5)
+    """
+    # --- Progress bar and info frame ---
+    frame_progress = ttk.Frame(root)
+    frame_progress.pack(pady=5, fill="x")
 
-    # Time display labels
-    label_elapsed = Label(root, text="Elapsed: 0s")
-    label_elapsed.pack()
-    label_remaining = Label(root, text="Estimated remaining: --")
-    label_remaining.pack()
+    # Elapsed/remaining on left, processed/total on right
+    frame_left = ttk.Frame(frame_progress)
+    frame_left.pack(side="left", anchor="w")
+    frame_right = ttk.Frame(frame_progress)
+    frame_right.pack(side="right", anchor="e")
 
-    def update_progress(value, elapsed=None, remaining=None):
-        
+    label_elapsed = Label(frame_left, text="Elapsed: 0s")
+    label_elapsed.pack(anchor="w")
+    label_remaining = Label(frame_left, text="Estimated remaining: --")
+    label_remaining.pack(anchor="w")
+
+    label_processed = Label(frame_right, text="Processed: 0")
+    label_processed.pack(anchor="e")
+    label_total = Label(frame_right, text="Total: --")
+    label_total.pack(anchor="e")
+
+    progress = ttk.Progressbar(frame_progress, orient="horizontal", length=300, mode="determinate")
+    progress.pack(fill="x", pady=5, padx=5, expand=True)
+
+    # --- End progress bar/info frame ---
+
+    def update_progress(value, elapsed=None, remaining=None, processed=None, total=None):
         """
-        Update the progress bar and time labels.
+        Update the progress bar and info labels.
 
         Args:
             value (int): Percentage (0–100) to set the progress bar to.
             elapsed (float, optional): Elapsed time in seconds.
             remaining (float or None, optional): Estimated time remaining in seconds, or None if not available.
+            processed (int, optional): Number of files processed so far.
+            total (int, optional): Total number of files to process.
         """
         progress["value"] = value
         if elapsed is not None:
@@ -206,6 +226,10 @@ def main():
                 label_remaining.config(text=f"Estimated remaining: {int(remaining)}s")
             else:
                 label_remaining.config(text="Estimated remaining: --")
+        if processed is not None:
+            label_processed.config(text=f"Processed: {processed}")
+        if total is not None:
+            label_total.config(text=f"Total: {total}")
         root.update_idletasks()
 
     def browse_folder():
@@ -219,13 +243,17 @@ def main():
             label_selected_folder.config(text=folder, fg="black")
             listbox_results.delete(0, END)
             progress["value"] = 0
+            label_elapsed.config(text="Elapsed: 0s")
+            label_remaining.config(text="Estimated remaining: --")
+            label_processed.config(text="Processed: 0")
+            label_total.config(text="Total: --")
 
     def start_sorting():
         """
         Perform image sorting using the selected folder.
         Moves paired and single images into separate subfolders.
         Displays the result in the listbox and alerts completion.
-        Also shows elapsed and estimated remaining time.
+        Also shows elapsed and estimated remaining time, processed count, and total count.
         """
         folder = selected_folder["path"]
         if not folder:
@@ -235,26 +263,34 @@ def main():
         progress["value"] = 0
         label_elapsed.config(text="Elapsed: 0s")
         label_remaining.config(text="Estimated remaining: --")
+        label_processed.config(text="Processed: 0")
+        label_total.config(text="Total: --")
         listbox_results.delete(0, END)
 
         def task():
             start_time = time.time()
-            progress_last = [0]
+            image_files = get_image_files(folder)
+            total_files = len(image_files)
+            root.after(0, update_progress, 0, 0, None, 0, total_files)
+
+            processed = [0]
             def progress_callback(value):
                 now = time.time()
                 elapsed = now - start_time
+                # Estimate remaining time
                 if value > 0:
                     avg_time_per_percent = elapsed / value
                     remaining = avg_time_per_percent * (100 - value)
                 else:
                     remaining = -1
-                # Schedule UI update in main thread
-                root.after(0, update_progress, value, elapsed, remaining)
-                progress_last[0] = value
+                # Estimate processed count
+                processed_count = int((value / 100) * total_files)
+                processed[0] = processed_count
+                root.after(0, update_progress, value, elapsed, remaining, processed_count, total_files)
 
             pairs, singles = sort_images(folder, progress_callback)
             elapsed = time.time() - start_time
-            root.after(0, update_progress, 100, elapsed, 0)
+            root.after(0, update_progress, 100, elapsed, 0, total_files, total_files)
             root.after(0, lambda: [
                 listbox_results.insert(END, f"Pairs moved: {pairs}"),
                 listbox_results.insert(END, f"Singles moved: {singles}"),
