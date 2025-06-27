@@ -17,6 +17,8 @@ original ai prompt [20250624]:
 
 import os
 import shutil
+import threading
+import time
 from tkinter import filedialog, messagebox, Tk, Label, Button, Listbox, END
 from tkinter import ttk
 from datetime import datetime
@@ -88,6 +90,7 @@ def find_pairs(image_paths, progress_callback=None):
     Args:
         image_paths (list): List of image file paths.
         progress_callback (callable, optional): Function to report progress as a percentage (0–100).
+            Now supports extra timing arguments, but will be called with just (value) for backward compatibility.
 
     Returns:
         list: List of tuples, each containing two paired image paths.
@@ -123,6 +126,7 @@ def sort_images(folder, progress_callback=None):
     Args:
         folder (str): Path to the folder containing images.
         progress_callback (callable, optional): Function to report progress during sorting.
+            Should accept a single integer argument (percentage).
 
     Returns:
         tuple: (number of pairs moved, number of singles moved)
@@ -154,6 +158,7 @@ def main():
     - A 'Start' button to commence sorting after a folder is selected.
     - A listbox to display the result counts for pairs and singles.
     - A progress bar that updates as image pairs are processed.
+    - Elapsed time and estimated time remaining are displayed.
 
     """
     root = Tk()
@@ -177,14 +182,30 @@ def main():
     progress = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
     progress.pack(pady=5)
 
-    def update_progress(value):
+    # Time display labels
+    label_elapsed = Label(root, text="Elapsed: 0s")
+    label_elapsed.pack()
+    label_remaining = Label(root, text="Estimated remaining: --")
+    label_remaining.pack()
+
+    def update_progress(value, elapsed=None, remaining=None):
+        
         """
-        Update the progress bar to reflect the current percentage.
+        Update the progress bar and time labels.
 
         Args:
             value (int): Percentage (0–100) to set the progress bar to.
+            elapsed (float, optional): Elapsed time in seconds.
+            remaining (float or None, optional): Estimated time remaining in seconds, or None if not available.
         """
         progress["value"] = value
+        if elapsed is not None:
+            label_elapsed.config(text=f"Elapsed: {int(elapsed)}s")
+        if remaining is not None:
+            if remaining >= 0:
+                label_remaining.config(text=f"Estimated remaining: {int(remaining)}s")
+            else:
+                label_remaining.config(text="Estimated remaining: --")
         root.update_idletasks()
 
     def browse_folder():
@@ -204,18 +225,43 @@ def main():
         Perform image sorting using the selected folder.
         Moves paired and single images into separate subfolders.
         Displays the result in the listbox and alerts completion.
+        Also shows elapsed and estimated remaining time.
         """
         folder = selected_folder["path"]
         if not folder:
             messagebox.showwarning("No Folder", "Please select a folder first.")
             return
+
         progress["value"] = 0
-        pairs, singles = sort_images(folder, update_progress)
+        label_elapsed.config(text="Elapsed: 0s")
+        label_remaining.config(text="Estimated remaining: --")
         listbox_results.delete(0, END)
-        listbox_results.insert(END, f"Pairs moved: {pairs}")
-        listbox_results.insert(END, f"Singles moved: {singles}")
-        progress["value"] = 100
-        messagebox.showinfo("Done", f"Sorted {pairs} pairs and {singles} singles.")
+
+        def task():
+            start_time = time.time()
+            progress_last = [0]
+            def progress_callback(value):
+                now = time.time()
+                elapsed = now - start_time
+                if value > 0:
+                    avg_time_per_percent = elapsed / value
+                    remaining = avg_time_per_percent * (100 - value)
+                else:
+                    remaining = -1
+                # Schedule UI update in main thread
+                root.after(0, update_progress, value, elapsed, remaining)
+                progress_last[0] = value
+
+            pairs, singles = sort_images(folder, progress_callback)
+            elapsed = time.time() - start_time
+            root.after(0, update_progress, 100, elapsed, 0)
+            root.after(0, lambda: [
+                listbox_results.insert(END, f"Pairs moved: {pairs}"),
+                listbox_results.insert(END, f"Singles moved: {singles}"),
+                messagebox.showinfo("Done", f"Sorted {pairs} pairs and {singles} singles.")
+            ])
+
+        threading.Thread(target=task, daemon=True).start()
 
     # Folder selection button
     button_browse = Button(root, text="Browse", command=browse_folder)
