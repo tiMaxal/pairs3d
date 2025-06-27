@@ -5,10 +5,9 @@ A utility for sorting stereo image pairs in a folder.
 Pairs are detected based on file modification timestamps and perceptual image similarity.
 Pairs are moved into a 'pairs' subfolder, and unpaired images into a 'singles' subfolder.
 A simple Tkinter GUI allows users to select a folder and view results.
-"""
 
+    =====
 
-"""
 original ai prompt [20250624]:
 
  a way to separate pairs from folders also containing singles .. software that compares for image-similarity and closeness of time-created
@@ -19,6 +18,7 @@ original ai prompt [20250624]:
 import os
 import shutil
 from tkinter import filedialog, messagebox, Tk, Label, Button, Listbox, END
+from tkinter import ttk
 from datetime import datetime
 from PIL import Image
 import imagehash
@@ -81,12 +81,13 @@ def is_similar_image(file1, file2):
         return False
 
 
-def find_pairs(image_paths):
+def find_pairs(image_paths, progress_callback=None):
     """
     Find and return pairs of images that are close in time and visually similar.
 
     Args:
         image_paths (list): List of image file paths.
+        progress_callback (callable, optional): Function to report progress as a percentage (0–100).
 
     Returns:
         list: List of tuples, each containing two paired image paths.
@@ -94,6 +95,7 @@ def find_pairs(image_paths):
     image_paths.sort(key=get_image_timestamp)
     used = set()
     pairs = []
+    total = len(image_paths)
     for i, path1 in enumerate(image_paths):
         if path1 in used:
             continue
@@ -109,21 +111,24 @@ def find_pairs(image_paths):
                     used.add(path1)
                     used.add(path2)
                     break
+        if progress_callback:
+            progress_callback(min(100, int((i / total) * 100)))
     return pairs
 
 
-def sort_images(folder):
+def sort_images(folder, progress_callback=None):
     """
     Sort images in the given folder into 'pairs' and 'singles' subfolders.
 
     Args:
         folder (str): Path to the folder containing images.
+        progress_callback (callable, optional): Function to report progress during sorting.
 
     Returns:
         tuple: (number of pairs moved, number of singles moved)
     """
     image_files = get_image_files(folder)
-    pairs = find_pairs(image_files)
+    pairs = find_pairs(image_files, progress_callback)
     pairs_dir = os.path.join(folder, "pairs")
     singles_dir = os.path.join(folder, "singles")
     os.makedirs(pairs_dir, exist_ok=True)
@@ -148,6 +153,8 @@ def main():
     - A label to display the selected folder path.
     - A 'Start' button to commence sorting after a folder is selected.
     - A listbox to display the result counts for pairs and singles.
+    - A progress bar that updates as image pairs are processed.
+
     """
     root = Tk()
     root.title("pairs3d - Stereo Image Sorter")
@@ -167,6 +174,19 @@ def main():
     listbox_results = Listbox(root, width=40)
     listbox_results.pack(pady=10)
 
+    progress = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
+    progress.pack(pady=5)
+
+    def update_progress(value):
+        """
+        Update the progress bar to reflect the current percentage.
+
+        Args:
+            value (int): Percentage (0–100) to set the progress bar to.
+        """
+        progress["value"] = value
+        root.update_idletasks()
+
     def browse_folder():
         """
         Handle folder selection via file dialog and update the UI.
@@ -177,6 +197,7 @@ def main():
             selected_folder["path"] = folder
             label_selected_folder.config(text=folder, fg="black")
             listbox_results.delete(0, END)
+            progress["value"] = 0
 
     def start_sorting():
         """
@@ -188,10 +209,12 @@ def main():
         if not folder:
             messagebox.showwarning("No Folder", "Please select a folder first.")
             return
-        pairs, singles = sort_images(folder)
+        progress["value"] = 0
+        pairs, singles = sort_images(folder, update_progress)
         listbox_results.delete(0, END)
         listbox_results.insert(END, f"Pairs moved: {pairs}")
         listbox_results.insert(END, f"Singles moved: {singles}")
+        progress["value"] = 100
         messagebox.showinfo("Done", f"Sorted {pairs} pairs and {singles} singles.")
 
     # Folder selection button
