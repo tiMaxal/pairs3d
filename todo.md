@@ -1,7 +1,11 @@
 to do:
 - [done] `start` button
 - [done] progress bar
-- Cross-platform support: Windows and Linux
+- show no. of files being processed
+- `pause` button
+- `exit` button
+- process subfolders
+- Cross-platform support: Windows and Linux [+ mac?]
 
 
 Package as:
