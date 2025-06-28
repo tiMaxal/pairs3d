@@ -146,6 +146,15 @@ def sort_images(folder, progress_callback=None):
             shutil.move(file, os.path.join(singles_dir, os.path.basename(file)))
     return len(pairs), len(image_files) - len(paired_files)
 
+# Confirm close if work in progress
+def confirm_close(root, progress):
+    if 0 < progress["value"] < 100:
+        if not messagebox.askyesno(
+            "Work in progress:",
+            " Are you sure you want to close?",
+        ):
+            return
+    root.destroy()
 
 def main():
     """
@@ -157,7 +166,10 @@ def main():
     - A 'Start' button to commence sorting after a folder is selected.
     - A listbox to display the result counts for pairs and singles.
     - A progress bar that updates as image pairs are processed.
-    - Elapsed time (left), processed count (right), and estimated time remaining (left, below elapsed) and total file count (right, below processed) are displayed.
+    - Elapsed time (left), processed count (right),
+        and estimated time remaining (left, below elapsed)
+            and total file count (right, below processed) are displayed.
+    - A 'Close' button to exit the app, with alert warning tied to progress bar.
     """
     root = Tk()
     root.title("pairs3d - Stereo Image Sorter")
@@ -299,13 +311,21 @@ def main():
 
         threading.Thread(target=task, daemon=True).start()
 
+    frame_left_buttons = ttk.Frame(root)
+    frame_left_buttons.pack(side="left", anchor="nw", padx=10, pady=5)
+    
     # Folder selection button
-    button_browse = Button(root, text="Browse", command=browse_folder)
+    button_browse = Button(frame_left_buttons, text="Browse", command=browse_folder)
     button_browse.pack(pady=5)
 
+
     # Start sorting button
-    button_start = Button(root, text="Start", command=start_sorting)
+    button_start = Button(frame_left_buttons, text="Start", command=start_sorting)
     button_start.pack(pady=5)
+
+    # Close window button
+    button_close = Button(root, text="Close", command=lambda: confirm_close(root, progress))
+    button_close.pack(side="right", anchor="se", padx=5, pady=5)
 
     root.mainloop()
 
