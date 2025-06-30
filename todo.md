@@ -1,10 +1,12 @@
 to do:
 - [done] `start` button
 - [done] progress bar
-- show no. of files being processed
-- `pause` button
-- `exit` button
+- [done] show no. of files being processed
+- [done] `pause` button
+- also cause 'pause' to pause timer
+- [done] `exit` button
 - process subfolders
+- show folder contents in 'chooser'
 - Cross-platform support: Windows and Linux [+ mac?]
 
 

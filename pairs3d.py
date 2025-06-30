@@ -19,7 +19,7 @@ import os
 import shutil
 import threading
 import time
-from tkinter import filedialog, messagebox, Tk, Label, Button, Listbox, END
+from tkinter import filedialog, messagebox, Tk, Label, Button, Listbox, END, StringVar
 from tkinter import ttk
 from datetime import datetime
 from PIL import Image
@@ -83,8 +83,10 @@ def is_similar_image(file1, file2):
         return False
 
 
+# OLD find_pairs and sort_images logic
+"""
 def find_pairs(image_paths, progress_callback=None):
-    """
+    ---
     Find and return pairs of images that are close in time and visually similar.
 
     Args:
@@ -94,7 +96,7 @@ def find_pairs(image_paths, progress_callback=None):
 
     Returns:
         list: List of tuples, each containing two paired image paths.
-    """
+    ---
     image_paths.sort(key=get_image_timestamp)
     used = set()
     pairs = []
@@ -120,7 +122,7 @@ def find_pairs(image_paths, progress_callback=None):
 
 
 def sort_images(folder, progress_callback=None):
-    """
+    ---
     Sort images in the given folder into 'pairs' and 'singles' subfolders.
 
     Args:
@@ -130,7 +132,7 @@ def sort_images(folder, progress_callback=None):
 
     Returns:
         tuple: (number of pairs moved, number of singles moved)
-    """
+    ---
     image_files = get_image_files(folder)
     pairs = find_pairs(image_files, progress_callback)
     pairs_dir = os.path.join(folder, "pairs")
@@ -145,6 +147,7 @@ def sort_images(folder, progress_callback=None):
         if file not in paired_files:
             shutil.move(file, os.path.join(singles_dir, os.path.basename(file)))
     return len(pairs), len(image_files) - len(paired_files)
+"""
 
 # Confirm close if work in progress
 def confirm_close(root, progress):
@@ -169,6 +172,7 @@ def main():
     - Elapsed time (left), processed count (right),
         and estimated time remaining (left, below elapsed)
             and total file count (right, below processed) are displayed.
+    - A 'Pause' button to suspend processing [does not yet pause 'elapsed']
     - A 'Close' button to exit the app, with alert warning tied to progress bar.
     """
     root = Tk()
@@ -286,6 +290,7 @@ def main():
             root.after(0, update_progress, 0, 0, None, 0, total_files)
 
             processed = [0]
+
             def progress_callback(value):
                 now = time.time()
                 elapsed = now - start_time
@@ -300,6 +305,50 @@ def main():
                 processed[0] = processed_count
                 root.after(0, update_progress, value, elapsed, remaining, processed_count, total_files)
 
+
+            # Loop for pause support
+            image_files.sort(key=get_image_timestamp)
+            used = set()
+            pairs = []
+            for i, path1 in enumerate(image_files):
+                if path1 in used:
+                    continue
+                time1 = get_image_timestamp(path1)
+                for j in range(i + 1, len(image_files)):
+                    path2 = image_files[j]
+                    if path2 in used:
+                        continue
+                    time2 = get_image_timestamp(path2)
+                    if time2 and abs((time2 - time1).total_seconds()) <= TIME_DIFF_THRESHOLD:
+                        if is_similar_image(path1, path2):
+                            pairs.append((path1, path2))
+                            used.add(path1)
+                            used.add(path2)
+                            break
+                # Pause support: wait if paused
+                while not pause_event.is_set():
+                    time.sleep(0.1)
+                if progress_callback:
+                    progress_callback(min(100, int((i / len(image_files)) * 100)))
+
+            # find_pairs and sort_images logic
+            pairs_dir = os.path.join(folder, "pairs")
+            singles_dir = os.path.join(folder, "singles")
+            os.makedirs(pairs_dir, exist_ok=True)
+            os.makedirs(singles_dir, exist_ok=True)
+            paired_files = set([f for pair in pairs for f in pair])
+            for pair in pairs:
+                for file in pair:
+                    shutil.move(file, os.path.join(pairs_dir, os.path.basename(file)))
+            for file in image_files:
+                if file not in paired_files:
+                    shutil.move(file, os.path.join(singles_dir, os.path.basename(file)))
+            root.after(0, lambda: [
+                listbox_results.insert(END, f"Pairs moved: {len(pairs)}"),
+                listbox_results.insert(END, f"Singles moved: {len(image_files) - len(paired_files)}"),
+                messagebox.showinfo("Done", f"Sorted {len(pairs)} pairs and {len(image_files) - len(paired_files)} singles.")
+            ])
+
             pairs, singles = sort_images(folder, progress_callback)
             elapsed = time.time() - start_time
             root.after(0, update_progress, 100, elapsed, 0, total_files, total_files)
@@ -311,6 +360,7 @@ def main():
 
         threading.Thread(target=task, daemon=True).start()
 
+    # left frame select/sort buttons
     frame_left_buttons = ttk.Frame(root)
     frame_left_buttons.pack(side="left", anchor="nw", padx=10, pady=5)
     
@@ -318,14 +368,33 @@ def main():
     button_browse = Button(frame_left_buttons, text="Browse", command=browse_folder)
     button_browse.pack(pady=5)
 
-
     # Start sorting button
     button_start = Button(frame_left_buttons, text="Start", command=start_sorting)
     button_start.pack(pady=5)
 
+    # right frame pause/close buttons
+    frame_right_buttons = ttk.Frame(root)
+    frame_right_buttons.pack(side="right", anchor="se", padx=10, pady=5)
+    
+    # Pause/Continue button
+    pause_event = threading.Event()
+    pause_event.set()  # Start unpaused
+    pause_continue_label = StringVar(value="Pause")
+
+    def pause_or_continue():
+        if pause_event.is_set():
+            pause_event.clear()
+            pause_continue_label.set("Continue")
+        else:
+            pause_event.set()
+            pause_continue_label.set("Pause")
+
+    button_pause = Button(frame_right_buttons, textvariable=pause_continue_label, command=pause_or_continue)
+    button_pause.pack(pady=5)
+
     # Close window button
-    button_close = Button(root, text="Close", command=lambda: confirm_close(root, progress))
-    button_close.pack(side="right", anchor="se", padx=5, pady=5)
+    button_close = Button(frame_right_buttons, text="Close", command=lambda: confirm_close(root, progress))
+    button_close.pack(pady=5)
 
     root.mainloop()
 
