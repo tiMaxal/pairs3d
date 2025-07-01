@@ -3,9 +3,10 @@ to do:
 - [done] progress bar
 - [done] show no. of files being processed
 - [done] `pause` button
-- also cause 'pause' to pause timer
+- [done] also cause 'pause' to pause timer
 - [done] `exit` button
 - process subfolders
+- action 'alt' for keyboard control
 - show folder contents in 'chooser'
 - Cross-platform support: Windows and Linux [+ mac?]
 

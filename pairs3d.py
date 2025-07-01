@@ -293,7 +293,8 @@ def main():
 
             def progress_callback(value):
                 now = time.time()
-                elapsed = now - start_time
+                # allows for intervening 'pause'
+                elapsed = max(0, now - start_time - total_paused_time[0])
                 # Estimate remaining time
                 if value > 0:
                     avg_time_per_percent = elapsed / value
@@ -380,14 +381,22 @@ def main():
     pause_event = threading.Event()
     pause_event.set()  # Start unpaused
     pause_continue_label = StringVar(value="Pause")
+    pause_start_time = [None]  # Use list for mutability in closures
+    total_paused_time = [0]
 
     def pause_or_continue():
         if pause_event.is_set():
+            # Pausing: record when pause starts
             pause_event.clear()
             pause_continue_label.set("Continue")
+            pause_start_time[0] = time.time()
         else:
+            # Resuming: add to total paused time
             pause_event.set()
             pause_continue_label.set("Pause")
+            if pause_start_time[0] is not None:
+                total_paused_time[0] += time.time() - pause_start_time[0]
+                pause_start_time[0] = None
 
     button_pause = Button(frame_right_buttons, textvariable=pause_continue_label, command=pause_or_continue)
     button_pause.pack(pady=5)
