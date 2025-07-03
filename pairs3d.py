@@ -27,7 +27,7 @@ import imagehash
 TIME_DIFF_THRESHOLD = 2
 HASH_DIFF_THRESHOLD = 10
 
-SETTINGS_FILE = "settings.txt"
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.txt")
 
 def load_last_folder():
     """
