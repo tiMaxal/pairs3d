@@ -23,6 +23,8 @@ Detects stereo image pairs based on:
 - Moves identified pairs to a pairs/ folder
 - Moves remaining images to a singles/ folder
 - Simple GUI for folder selection
+- can process subfolders [by checkbox]
+- uses settings.txt file to remember most recent folder chosen
 
 **author note**
 
