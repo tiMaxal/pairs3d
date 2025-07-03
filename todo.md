@@ -5,9 +5,9 @@ to do:
 - [done] `pause` button
 - [done] also cause 'pause' to pause timer
 - [done] `exit` button
-- process subfolders
+- [done] process subfolders
 - action 'alt' for keyboard control
-- show folder contents in 'chooser'
+- show folder contents in 'chooser' [whether images exist there]
 - Cross-platform support: Windows and Linux [+ mac?]
 
 
