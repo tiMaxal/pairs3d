@@ -14,7 +14,6 @@ original ai prompt [20250624]:
 
 """
 
-
 import os
 import shutil
 import threading
@@ -149,6 +148,7 @@ def sort_images(folder, progress_callback=None):
     return len(pairs), len(image_files) - len(paired_files)
 """
 
+
 # Confirm close if work in progress
 def confirm_close(root, progress):
     if 0 < progress["value"] < 100:
@@ -158,6 +158,7 @@ def confirm_close(root, progress):
         ):
             return
     root.destroy()
+
 
 def main():
     """
@@ -218,12 +219,16 @@ def main():
     label_total = Label(frame_right, text="Total: --")
     label_total.pack(anchor="e")
 
-    progress = ttk.Progressbar(frame_progress, orient="horizontal", length=300, mode="determinate")
+    progress = ttk.Progressbar(
+        frame_progress, orient="horizontal", length=300, mode="determinate"
+    )
     progress.pack(fill="x", pady=5, padx=5, expand=True)
 
     # --- End progress bar/info frame ---
 
-    def update_progress(value, elapsed=None, remaining=None, processed=None, total=None):
+    def update_progress(
+        value, elapsed=None, remaining=None, processed=None, total=None
+    ):
         """
         Update the progress bar and info labels.
 
@@ -293,7 +298,8 @@ def main():
 
             def progress_callback(value):
                 now = time.time()
-                elapsed = now - start_time
+                # allows for intervening 'pause'
+                elapsed = max(0, now - start_time - total_paused_time[0])
                 # Estimate remaining time
                 if value > 0:
                     avg_time_per_percent = elapsed / value
@@ -303,8 +309,15 @@ def main():
                 # Estimate processed count
                 processed_count = int((value / 100) * total_files)
                 processed[0] = processed_count
-                root.after(0, update_progress, value, elapsed, remaining, processed_count, total_files)
-
+                root.after(
+                    0,
+                    update_progress,
+                    value,
+                    elapsed,
+                    remaining,
+                    processed_count,
+                    total_files,
+                )
 
             # Loop for pause support
             image_files.sort(key=get_image_timestamp)
@@ -319,7 +332,10 @@ def main():
                     if path2 in used:
                         continue
                     time2 = get_image_timestamp(path2)
-                    if time2 and abs((time2 - time1).total_seconds()) <= TIME_DIFF_THRESHOLD:
+                    if (
+                        time2
+                        and abs((time2 - time1).total_seconds()) <= TIME_DIFF_THRESHOLD
+                    ):
                         if is_similar_image(path1, path2):
                             pairs.append((path1, path2))
                             used.add(path1)
@@ -343,27 +359,45 @@ def main():
             for file in image_files:
                 if file not in paired_files:
                     shutil.move(file, os.path.join(singles_dir, os.path.basename(file)))
-            root.after(0, lambda: [
-                listbox_results.insert(END, f"Pairs moved: {len(pairs)}"),
-                listbox_results.insert(END, f"Singles moved: {len(image_files) - len(paired_files)}"),
-                messagebox.showinfo("Done", f"Sorted {len(pairs)} pairs and {len(image_files) - len(paired_files)} singles.")
-            ])
+            
+            """
+            root.after(
+                0,
+                lambda: [
+                    listbox_results.insert(END, f"Pairs moved: {len(pairs)}"),
+                    listbox_results.insert(
+                        END, f"Singles moved: {len(image_files) - len(paired_files)}"
+                    ),
+                    messagebox.showinfo(
+                        "Done",
+                        f"Sorted {len(pairs)} pairs and {len(image_files) - len(paired_files)} singles.",
+                    ),
+                ],
+            )
 
-            pairs, singles = sort_images(folder, progress_callback)
+            """
+            num_pairs = len(pairs)
+            num_singles = len(image_files) - len(paired_files)
             elapsed = time.time() - start_time
             root.after(0, update_progress, 100, elapsed, 0, total_files, total_files)
-            root.after(0, lambda: [
-                listbox_results.insert(END, f"Pairs moved: {pairs}"),
-                listbox_results.insert(END, f"Singles moved: {singles}"),
-                messagebox.showinfo("Done", f"Sorted {pairs} pairs and {singles} singles.")
-            ])
-
+            root.after(
+                0,
+                lambda: [
+                    listbox_results.insert(END, f"Pairs moved: {num_pairs}"),
+                    listbox_results.insert(END, f"Singles moved: {num_singles}"),
+                    messagebox.showinfo(
+                        "Done", f"Sorted {num_pairs} pairs and {num_singles} singles."
+                    ),
+                ],
+            )
+    
+            # Start the sorting in a background thread
         threading.Thread(target=task, daemon=True).start()
 
     # left frame select/sort buttons
     frame_left_buttons = ttk.Frame(root)
     frame_left_buttons.pack(side="left", anchor="nw", padx=10, pady=5)
-    
+
     # Folder selection button
     button_browse = Button(frame_left_buttons, text="Browse", command=browse_folder)
     button_browse.pack(pady=5)
@@ -375,25 +409,39 @@ def main():
     # right frame pause/close buttons
     frame_right_buttons = ttk.Frame(root)
     frame_right_buttons.pack(side="right", anchor="se", padx=10, pady=5)
-    
+
     # Pause/Continue button
     pause_event = threading.Event()
     pause_event.set()  # Start unpaused
     pause_continue_label = StringVar(value="Pause")
+    pause_start_time = [None]  # Use list for mutability in closures
+    total_paused_time = [0]
 
     def pause_or_continue():
         if pause_event.is_set():
+            # Pausing: record when pause starts
             pause_event.clear()
             pause_continue_label.set("Continue")
+            pause_start_time[0] = time.time()
         else:
+            # Resuming: add to total paused time
             pause_event.set()
             pause_continue_label.set("Pause")
+            if pause_start_time[0] is not None:
+                total_paused_time[0] += time.time() - pause_start_time[0]
+                pause_start_time[0] = None
 
-    button_pause = Button(frame_right_buttons, textvariable=pause_continue_label, command=pause_or_continue)
+    button_pause = Button(
+        frame_right_buttons,
+        textvariable=pause_continue_label,
+        command=pause_or_continue,
+    )
     button_pause.pack(pady=5)
 
     # Close window button
-    button_close = Button(frame_right_buttons, text="Close", command=lambda: confirm_close(root, progress))
+    button_close = Button(
+        frame_right_buttons, text="Close", command=lambda: confirm_close(root, progress)
+    )
     button_close.pack(pady=5)
 
     root.mainloop()
