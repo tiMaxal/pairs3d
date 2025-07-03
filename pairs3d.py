@@ -27,6 +27,37 @@ import imagehash
 TIME_DIFF_THRESHOLD = 2
 HASH_DIFF_THRESHOLD = 10
 
+SETTINGS_FILE = "settings.txt"
+
+def load_last_folder():
+    """
+    Load the last used folder path from the settings file.
+    Returns:
+        str or None: The last used folder path, or None if not set.
+    """
+    if os.path.exists(SETTINGS_FILE):
+        try:
+            with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+                folder = f.read().strip()
+                if folder and os.path.isdir(folder):
+                    return folder
+        except Exception:
+            pass
+    return None
+
+
+def save_last_folder(folder):
+    """
+    Save the given folder path to the settings file.
+    Args:
+        folder (str): The folder path to save.
+    """
+    try:
+        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+            f.write(folder)
+    except Exception:
+        pass
+
 
 def get_image_files(directory):
     """
@@ -81,6 +112,7 @@ def is_similar_image(file1, file2):
     except Exception:
         return False
 
+
 # Confirm close if work in progress
 def confirm_close(root, progress):
     if 0 < progress["value"] < 100:
@@ -111,15 +143,20 @@ def main():
     root = Tk()
     root.title("pairs3d - Stereo Image Sorter")
 
-    # Store selected folder path using a mutable object
-    selected_folder = {"path": None}
+    # Store selected folder path using a mutable object, initialized from settings
+    selected_folder = {"path": load_last_folder()}
 
     # Prompt text
     label = Label(root, text="Select a folder containing images to sort:")
     label.pack(pady=10)
 
-    # Display selected folder (initially none)
-    label_selected_folder = Label(root, text="No folder selected", fg="gray")
+    # Display selected folder (show last folder if available)
+    init_folder = selected_folder["path"]
+    label_selected_folder = Label(
+        root,
+        text=init_folder if init_folder else "No folder selected",
+        fg="black" if init_folder else "gray",
+    )
     label_selected_folder.pack()
 
     # Display results
@@ -188,11 +225,13 @@ def main():
     def browse_folder():
         """
         Handle folder selection via file dialog and update the UI.
-        Does not perform sorting; only sets the selected folder.
+        Remembers the last used folder across sessions.
         """
-        folder = filedialog.askdirectory()
+        initialdir = selected_folder["path"] if selected_folder["path"] else None
+        folder = filedialog.askdirectory(initialdir=initialdir)
         if folder:
             selected_folder["path"] = folder
+            save_last_folder(folder)
             label_selected_folder.config(text=folder, fg="black")
             listbox_results.delete(0, END)
             progress["value"] = 0
@@ -209,6 +248,7 @@ def main():
         Also shows elapsed and estimated remaining time, processed count, and total count.
         """
         folder = selected_folder["path"]
+        save_last_folder(folder)
         if not folder:
             messagebox.showwarning("No Folder", "Please select a folder first.")
             return
@@ -306,8 +346,9 @@ def main():
                     ),
                 ],
             )
-    
+
             # Start the sorting in a background thread
+
         threading.Thread(target=task, daemon=True).start()
 
     # left frame select/sort buttons
