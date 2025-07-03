@@ -29,6 +29,7 @@ HASH_DIFF_THRESHOLD = 10
 
 SETTINGS_FILE = os.path.join(os.path.dirname(__file__), "settings.txt")
 
+
 def load_last_folder():
     """
     Load the last used folder path from the settings file.
@@ -59,21 +60,64 @@ def save_last_folder(folder):
         pass
 
 
-def get_image_files(directory):
+def get_image_files(directory, recursive=False):
     """
-    Retrieve a list of image file paths from the given directory.
+    Retrieve a list of image file paths from the given directory (and optionally subdirectories),
+    skipping any 'pairs' or 'singles' folders.
 
     Args:
         directory (str): Path to the directory to search.
+        recursive (bool): Whether to include image files from subdirectories.
 
     Returns:
         list: List of image file paths with extensions .jpg, .jpeg, or .png.
     """
-    return [
-        os.path.join(directory, f)
-        for f in os.listdir(directory)
-        if f.lower().endswith((".jpg", ".jpeg", ".png"))
-    ]
+    image_files = []
+    if recursive:
+        for root, dirs, files in os.walk(directory):
+            # Skip 'pairs' and 'singles' folders
+            dirs[:] = [d for d in dirs if d not in ("pairs", "singles")]
+            for f in files:
+                if f.lower().endswith((".jpg", ".jpeg", ".png")):
+                    image_files.append(os.path.join(root, f))
+    else:
+        image_files = [
+            os.path.join(directory, f)
+            for f in os.listdir(directory)
+            if f.lower().endswith((".jpg", ".jpeg", ".png"))
+            and os.path.isfile(os.path.join(directory, f))
+        ]
+    return image_files
+
+
+def get_image_files_by_folder(directory, recursive=False):
+    """
+    Retrieve image files grouped by folder. When recursive is True,
+    returns a dictionary mapping each folder path to its own list of image files.
+
+    Skips 'pairs' and 'singles' folders.
+
+    Args:
+        directory (str): Root directory.
+        recursive (bool): Whether to include subfolders.
+
+    Returns:
+        dict: Mapping from folder path to list of image file paths.
+    """
+    folders = {}
+    if recursive:
+        for root, dirs, files in os.walk(directory):
+            dirs[:] = [d for d in dirs if d not in ("pairs", "singles")]
+            image_files = [
+                os.path.join(root, f)
+                for f in files
+                if f.lower().endswith((".jpg", ".jpeg", ".png"))
+            ]
+            if image_files:
+                folders[root] = image_files
+    else:
+        folders[directory] = get_image_files(directory, recursive=False)
+    return folders
 
 
 def get_image_timestamp(path):
@@ -104,10 +148,9 @@ def is_similar_image(file1, file2):
         bool: True if images are similar within the hash threshold, False otherwise.
     """
     try:
-        img1 = Image.open(file1)
-        img2 = Image.open(file2)
-        hash1 = imagehash.phash(img1)
-        hash2 = imagehash.phash(img2)
+        with Image.open(file1) as img1, Image.open(file2) as img2:
+            hash1 = imagehash.phash(img1)
+            hash2 = imagehash.phash(img2)
         return abs(hash1 - hash2) < HASH_DIFF_THRESHOLD
     except Exception:
         return False
@@ -158,6 +201,17 @@ def main():
         fg="black" if init_folder else "gray",
     )
     label_selected_folder.pack()
+
+    # Checkbox for processing subfolders
+    process_subfolders_var = StringVar(value="0")
+    check_subfolders = ttk.Checkbutton(
+        root,
+        text="Process subfolders",
+        variable=process_subfolders_var,
+        onvalue="1",
+        offvalue="0",
+    )
+    check_subfolders.pack()
 
     # Display results
     listbox_results = Listbox(root, width=40)
@@ -262,7 +316,10 @@ def main():
 
         def task():
             start_time = time.time()
-            image_files = get_image_files(folder)
+            folders_dict = get_image_files_by_folder(
+                folder, recursive=(process_subfolders_var.get() == "1")
+            )
+            image_files = [f for files in folders_dict.values() for f in files]
             total_files = len(image_files)
             root.after(0, update_progress, 0, 0, None, 0, total_files)
 
@@ -319,21 +376,30 @@ def main():
                 if progress_callback:
                     progress_callback(min(100, int((i / len(image_files)) * 100)))
 
-            # find_pairs and sort_images logic
-            pairs_dir = os.path.join(folder, "pairs")
-            singles_dir = os.path.join(folder, "singles")
-            os.makedirs(pairs_dir, exist_ok=True)
-            os.makedirs(singles_dir, exist_ok=True)
-            paired_files = set([f for pair in pairs for f in pair])
+            # move files to local 'pairs' or 'singles' folders in each folder
             for pair in pairs:
                 for file in pair:
-                    shutil.move(file, os.path.join(pairs_dir, os.path.basename(file)))
+                    subdir = os.path.dirname(file)
+                    dest_dir = os.path.join(subdir, "pairs")
+                    os.makedirs(dest_dir, exist_ok=True)
+                    # shutil.move(file, os.path.join(dest_dir, os.path.basename(file)))
+                    src = file
+                    dst = os.path.join(dest_dir, os.path.basename(file))
+                    if os.path.exists(src):
+                        try:
+                            shutil.move(src, dst)
+                        except FileNotFoundError:
+                            pass
+
             for file in image_files:
-                if file not in paired_files:
-                    shutil.move(file, os.path.join(singles_dir, os.path.basename(file)))
+                if file not in used:
+                    subdir = os.path.dirname(file)
+                    dest_dir = os.path.join(subdir, "singles")
+                    os.makedirs(dest_dir, exist_ok=True)
+                    shutil.move(file, os.path.join(dest_dir, os.path.basename(file)))
 
             num_pairs = len(pairs)
-            num_singles = len(image_files) - len(paired_files)
+            num_singles = len(image_files) - len(used)
             elapsed = time.time() - start_time
             root.after(0, update_progress, 100, elapsed, 0, total_files, total_files)
             root.after(
