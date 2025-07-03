@@ -81,74 +81,6 @@ def is_similar_image(file1, file2):
     except Exception:
         return False
 
-
-# OLD find_pairs and sort_images logic
-"""
-def find_pairs(image_paths, progress_callback=None):
-    ---
-    Find and return pairs of images that are close in time and visually similar.
-
-    Args:
-        image_paths (list): List of image file paths.
-        progress_callback (callable, optional): Function to report progress as a percentage (0–100).
-            Now supports extra timing arguments, but will be called with just (value) for backward compatibility.
-
-    Returns:
-        list: List of tuples, each containing two paired image paths.
-    ---
-    image_paths.sort(key=get_image_timestamp)
-    used = set()
-    pairs = []
-    total = len(image_paths)
-    for i, path1 in enumerate(image_paths):
-        if path1 in used:
-            continue
-        time1 = get_image_timestamp(path1)
-        for j in range(i + 1, len(image_paths)):
-            path2 = image_paths[j]
-            if path2 in used:
-                continue
-            time2 = get_image_timestamp(path2)
-            if time2 and abs((time2 - time1).total_seconds()) <= TIME_DIFF_THRESHOLD:
-                if is_similar_image(path1, path2):
-                    pairs.append((path1, path2))
-                    used.add(path1)
-                    used.add(path2)
-                    break
-        if progress_callback:
-            progress_callback(min(100, int((i / total) * 100)))
-    return pairs
-
-
-def sort_images(folder, progress_callback=None):
-    ---
-    Sort images in the given folder into 'pairs' and 'singles' subfolders.
-
-    Args:
-        folder (str): Path to the folder containing images.
-        progress_callback (callable, optional): Function to report progress during sorting.
-            Should accept a single integer argument (percentage).
-
-    Returns:
-        tuple: (number of pairs moved, number of singles moved)
-    ---
-    image_files = get_image_files(folder)
-    pairs = find_pairs(image_files, progress_callback)
-    pairs_dir = os.path.join(folder, "pairs")
-    singles_dir = os.path.join(folder, "singles")
-    os.makedirs(pairs_dir, exist_ok=True)
-    os.makedirs(singles_dir, exist_ok=True)
-    paired_files = set([f for pair in pairs for f in pair])
-    for pair in pairs:
-        for file in pair:
-            shutil.move(file, os.path.join(pairs_dir, os.path.basename(file)))
-    for file in image_files:
-        if file not in paired_files:
-            shutil.move(file, os.path.join(singles_dir, os.path.basename(file)))
-    return len(pairs), len(image_files) - len(paired_files)
-"""
-
-
 # Confirm close if work in progress
 def confirm_close(root, progress):
     if 0 < progress["value"] < 100:
@@ -359,23 +291,7 @@ def main():
             for file in image_files:
                 if file not in paired_files:
                     shutil.move(file, os.path.join(singles_dir, os.path.basename(file)))
-            
-            """
-            root.after(
-                0,
-                lambda: [
-                    listbox_results.insert(END, f"Pairs moved: {len(pairs)}"),
-                    listbox_results.insert(
-                        END, f"Singles moved: {len(image_files) - len(paired_files)}"
-                    ),
-                    messagebox.showinfo(
-                        "Done",
-                        f"Sorted {len(pairs)} pairs and {len(image_files) - len(paired_files)} singles.",
-                    ),
-                ],
-            )
 
-            """
             num_pairs = len(pairs)
             num_singles = len(image_files) - len(paired_files)
             elapsed = time.time() - start_time
