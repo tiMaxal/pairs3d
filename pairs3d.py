@@ -3,12 +3,12 @@ pairs3d.py
 
 A utility for sorting stereo image pairs in a folder.
 Pairs are detected based on file modification timestamps and perceptual image similarity.
-Pairs are moved into a 'pairs' subfolder, and unpaired images into a 'singles' subfolder.
-A simple Tkinter GUI allows users to select a folder and view results.
+Pairs are moved into a '_pairs' subfolder, and unpaired images into a 'singles' subfolder.
+A simple GUI picker allows users to select a folder and view results.
 
     =====
 
-original ai prompt [20250624]:
+vibe-coded 'voded' from original ai prompt [chatgpt 'getting to know you' 20250624] with perplexity-ai, and copilot-ai:
 
  a way to separate pairs from folders also containing singles .. software that compares for image-similarity and closeness of time-created
 
@@ -172,20 +172,19 @@ def main():
     Launch the Tkinter GUI for selecting a folder and sorting stereo image pairs.
     The interface provides:
     - A label to prompt folder selection.
+    - A label to display the currently selected folder path.
     - A 'Browse' button to choose a directory containing image files.
     - A checkbox to enable processing of subfolders.
-    - A label to display the currently selected folder path.
-    - displays the contents of the selected folder in a Listbox,
+    - Displays the contents of the selected folder in a Listbox,
         [allow to assess whether the folder needs processing.]
-    - A label to display the selected folder path.
     - A 'Start' button to commence sorting after a folder is selected.
-    - A listbox to display the result counts for pairs and singles.
     - A progress bar that updates as image pairs are processed.
     - Elapsed time (left), processed count (right),
         and estimated time remaining (left, below elapsed)
             and total file count (right, below processed) are displayed.
-    - A 'Pause' button to suspend processing [does not yet pause 'elapsed']
-    - A 'Close' button to exit the app, with alert warning tied to progress bar.
+    - A 'Pause' button to suspend processing.
+    - A listbox to display the result counts for pairs and singles.
+    - A 'Close' button to exit the app, with alert warning tied to unfinished progress bar.
     """
     root = Tk()
     root.resizable(True, True)
@@ -200,25 +199,55 @@ def main():
 
     # Display selected folder (show last folder if available)
     init_folder = selected_folder["path"]
+
+    # Frame for folder label and browse button side by side
+    frame_folder = ttk.Frame(root)
+    frame_folder.pack(fill="x", padx=10)
+
     label_selected_folder = Label(
-        root,
+        frame_folder,
         text=init_folder if init_folder else "No folder selected",
         fg="black" if init_folder else "gray",
     )
-    label_selected_folder.pack()
+    label_selected_folder.pack(side="left", fill="x", expand=True)
 
-    # Listbox and Scrollbar to show folder contents
-    frame_listbox = ttk.Frame(root)
-    frame_listbox.pack(fill="both", expand=True, padx=10, pady=5)
+    def browse_folder():
+        """
+        Handle folder selection via file dialog and update the UI.
+        Displays the contents of the selected folder in a Listbox.
+        Remembers the last used folder across sessions.
+        """
+        initialdir = selected_folder["path"] if selected_folder["path"] else None
+        folder = filedialog.askdirectory(initialdir=initialdir)
+        if folder:
+            selected_folder["path"] = folder
+            save_last_folder(folder)
+            label_selected_folder.config(text=folder, fg="black")
+            listbox_results.delete(0, END)
+            progress["value"] = 0
+            label_elapsed.config(text="Elapsed: 0s")
+            label_remaining.config(text="Estimated remaining: --")
+            label_processed.config(text="Processed: 0")
+            label_total.config(text="Total: --")
+            update_folder_contents_listbox()  # Update listbox with folder contents
+            # Show folder contents
+            recursive = process_subfolders_var.get() == "1"
+            try:
+                folders_dict = get_image_files_by_folder(folder, recursive=recursive)
+                for subfolder, files in sorted(folders_dict.items()):
+                    # Show subfolder name (relative to root)
+                    rel_subfolder = os.path.relpath(subfolder, folder)
+                    listbox_folder_contents.insert(END, f"[{rel_subfolder}]")
+                    for f in sorted(files):
+                        listbox_folder_contents.insert(
+                            END, f"    {os.path.basename(f)}"
+                        )
+            except Exception as e:
+                listbox_folder_contents.insert(END, f"Error: {e}")
 
-    listbox_folder_contents = Listbox(frame_listbox, width=80, height=18)
-    listbox_folder_contents.pack(side="left", fill="both", expand=True)
-
-    scrollbar_folder = ttk.Scrollbar(frame_listbox, orient="vertical", command=listbox_folder_contents.yview)
-    scrollbar_folder.pack(side="right", fill="y")
-
-    listbox_folder_contents.config(yscrollcommand=scrollbar_folder.set)
-
+    # Folder selection button (Browse) on the right of the label
+    button_browse = Button(frame_folder, text="Browse", command=browse_folder)
+    button_browse.pack(side="right", padx=5, pady=5)
 
     # Checkbox for processing subfolders
     process_subfolders_var = StringVar(value="0")
@@ -232,28 +261,49 @@ def main():
     )
     check_subfolders.pack()
 
+    label_image_count = Label(root, text="No folder selected")
+    label_image_count.pack()
+
+    # Listbox and Scrollbar to show folder contents
+    frame_listbox = ttk.Frame(root)
+    frame_listbox.pack(fill="both", expand=True, padx=10, pady=5)
+
+    listbox_folder_contents = Listbox(frame_listbox, width=80, height=18)
+    listbox_folder_contents.pack(side="left", fill="both", expand=True)
+
+    scrollbar_folder = ttk.Scrollbar(
+        frame_listbox, orient="vertical", command=listbox_folder_contents.yview
+    )
+    scrollbar_folder.pack(side="right", fill="y")
+
+    listbox_folder_contents.config(yscrollcommand=scrollbar_folder.set)
+
     # Display results
-    listbox_results = Listbox(root, width=40)
+    listbox_results = Listbox(root, width=30, height=3)
     listbox_results.pack(pady=10)
 
+    # Function to update the Listbox with folder contents
     def update_folder_contents_listbox():
-            """
-            Update the Listbox to show images grouped by subfolder if 'Process subfolders' is checked.
-            """
-            listbox_folder_contents.delete(0, END)
-            folder = selected_folder["path"]
-            if not folder:
-                return
-            try:
-                recursive = process_subfolders_var.get() == "1"
-                folders_dict = get_image_files_by_folder(folder, recursive=recursive)
-                for subfolder, files in sorted(folders_dict.items()):
-                    rel_subfolder = os.path.relpath(subfolder, folder)
-                    listbox_folder_contents.insert(END, f"[{rel_subfolder}]")
-                    for f in sorted(files):
-                        listbox_folder_contents.insert(END, f"    {os.path.basename(f)}")
-            except Exception as e:
-                listbox_folder_contents.insert(END, f"Error: {e}")
+        """
+        Update the Listbox to show images grouped by subfolder if 'Process subfolders' is checked.
+        """
+        listbox_folder_contents.delete(0, END)
+        folder = selected_folder["path"]
+        if not folder:
+            return
+        try:
+            recursive = process_subfolders_var.get() == "1"
+            folders_dict = get_image_files_by_folder(folder, recursive=recursive)
+            total_images = sum(len(files) for files in folders_dict.values())
+            label_image_count.config(text=f"Total images found: {total_images}")
+            for subfolder, files in sorted(folders_dict.items()):
+                rel_subfolder = os.path.relpath(subfolder, folder)
+                listbox_folder_contents.insert(END, f"[{rel_subfolder}]")
+                for f in sorted(files):
+                    listbox_folder_contents.insert(END, f"    {os.path.basename(f)}")
+        except Exception as e:
+            label_image_count.config(text="Error reading folder")
+            listbox_folder_contents.insert(END, f"Error: {e}")
 
     # Callback for the checkbox
     check_subfolders.config(command=update_folder_contents_listbox)
@@ -268,9 +318,12 @@ def main():
     frame_progress.pack(pady=5, fill="x")
 
     # Elapsed/remaining on left, processed/total on right
-    frame_left = ttk.Frame(frame_progress)
+    frame_labels = ttk.Frame(frame_progress)
+    frame_labels.pack(fill="x")  # Place labels in a row
+
+    frame_left = ttk.Frame(frame_labels)
     frame_left.pack(side="left", anchor="w")
-    frame_right = ttk.Frame(frame_progress)
+    frame_right = ttk.Frame(frame_labels)
     frame_right.pack(side="right", anchor="e")
 
     label_elapsed = Label(frame_left, text="Elapsed: 0s")
@@ -316,38 +369,6 @@ def main():
         if total is not None:
             label_total.config(text=f"Total: {total}")
         root.update_idletasks()
-
-    def browse_folder():
-        """
-        Handle folder selection via file dialog and update the UI.
-        Displays the contents of the selected folder in a Listbox.
-        Remembers the last used folder across sessions.
-        """
-        initialdir = selected_folder["path"] if selected_folder["path"] else None
-        folder = filedialog.askdirectory(initialdir=initialdir)
-        if folder:
-            selected_folder["path"] = folder
-            save_last_folder(folder)
-            label_selected_folder.config(text=folder, fg="black")
-            listbox_results.delete(0, END)
-            progress["value"] = 0
-            label_elapsed.config(text="Elapsed: 0s")
-            label_remaining.config(text="Estimated remaining: --")
-            label_processed.config(text="Processed: 0")
-            label_total.config(text="Total: --")
-            update_folder_contents_listbox()  # Update listbox with folder contents
-            # Show folder contents
-            recursive = process_subfolders_var.get() == "1"
-            try:
-                folders_dict = get_image_files_by_folder(folder, recursive=recursive)
-                for subfolder, files in sorted(folders_dict.items()):
-                    # Show subfolder name (relative to root)
-                    rel_subfolder = os.path.relpath(subfolder, folder)
-                    listbox_folder_contents.insert(END, f"[{rel_subfolder}]")
-                    for f in sorted(files):
-                        listbox_folder_contents.insert(END, f"    {os.path.basename(f)}")
-            except Exception as e:
-                listbox_folder_contents.insert(END, f"Error: {e}")
 
     def start_sorting():
         """
@@ -472,23 +493,24 @@ def main():
 
         threading.Thread(target=task, daemon=True).start()
 
-    # left frame select/sort buttons
-    frame_left_buttons = ttk.Frame(root)
-    frame_left_buttons.pack(side="left", anchor="nw", padx=10, pady=5)
+    # --- Button row: Start | Pause | Close ---
+    frame_buttons = ttk.Frame(root)
+    frame_buttons.pack(fill="x", pady=10)
 
-    # Folder selection button
-    button_browse = Button(frame_left_buttons, text="Browse", command=browse_folder)
-    button_browse.pack(pady=5)
+    # Configure columns: spacers expand, buttons fixed
+    frame_buttons.columnconfigure(0, weight=1)  # left spacer
+    frame_buttons.columnconfigure(1, weight=0)  # left button
+    frame_buttons.columnconfigure(2, weight=1)  # center-left spacer
+    frame_buttons.columnconfigure(3, weight=0)  # center button
+    frame_buttons.columnconfigure(4, weight=1)  # center-right spacer
+    frame_buttons.columnconfigure(5, weight=0)  # right button
+    frame_buttons.columnconfigure(6, weight=1)  # right spacer
 
-    # Start sorting button
-    button_start = Button(frame_left_buttons, text="Start", command=start_sorting)
-    button_start.pack(pady=5)
+    # Start sorting button (left)
+    button_start = Button(frame_buttons, text="Start", command=start_sorting, width=10)
+    button_start.grid(row=0, column=1, padx=10)
 
-    # right frame pause/close buttons
-    frame_right_buttons = ttk.Frame(root)
-    frame_right_buttons.pack(side="right", anchor="se", padx=10, pady=5)
-
-    # Pause/Continue button
+    # Pause/Continue button (center)
     pause_event = threading.Event()
     pause_event.set()  # Start unpaused
     pause_continue_label = StringVar(value="Pause")
@@ -510,17 +532,18 @@ def main():
                 pause_start_time[0] = None
 
     button_pause = Button(
-        frame_right_buttons,
+        frame_buttons,
         textvariable=pause_continue_label,
         command=pause_or_continue,
+        width=10
     )
-    button_pause.pack(pady=5)
+    button_pause.grid(row=0, column=3, padx=10)
 
-    # Close window button
+    # Close window button (right)
     button_close = Button(
-        frame_right_buttons, text="Close", command=lambda: confirm_close(root, progress)
+        frame_buttons, text="Close", command=lambda: confirm_close(root, progress), width=10
     )
-    button_close.pack(pady=5)
+    button_close.grid(row=0, column=5, padx=10)
 
     root.mainloop()
 
