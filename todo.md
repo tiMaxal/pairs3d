@@ -8,6 +8,8 @@ to do:
 - [done] process subfolders
 - action 'alt' for keyboard control
 - show folder contents in 'chooser' [whether images exist there]
+- move progress bar between timer\filecount lines
+   [instead of showing info at ends of bar]
 - Cross-platform support: Windows and Linux [+ mac?]
 
 
