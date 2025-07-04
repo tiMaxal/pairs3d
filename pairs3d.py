@@ -188,6 +188,7 @@ def main():
     - A 'Close' button to exit the app, with alert warning tied to progress bar.
     """
     root = Tk()
+    root.resizable(True, True)
     root.title("pairs3d - Stereo Image Sorter")
 
     # Store selected folder path using a mutable object, initialized from settings
@@ -206,9 +207,18 @@ def main():
     )
     label_selected_folder.pack()
 
-    # Listbox to show folder contents
-    listbox_folder_contents = Listbox(root, width=60, height=8)
-    listbox_folder_contents.pack(pady=5)
+    # Listbox and Scrollbar to show folder contents
+    frame_listbox = ttk.Frame(root)
+    frame_listbox.pack(fill="both", expand=True, padx=10, pady=5)
+
+    listbox_folder_contents = Listbox(frame_listbox, width=80, height=18)
+    listbox_folder_contents.pack(side="left", fill="both", expand=True)
+
+    scrollbar_folder = ttk.Scrollbar(frame_listbox, orient="vertical", command=listbox_folder_contents.yview)
+    scrollbar_folder.pack(side="right", fill="y")
+
+    listbox_folder_contents.config(yscrollcommand=scrollbar_folder.set)
+
 
     # Checkbox for processing subfolders
     process_subfolders_var = StringVar(value="0")
