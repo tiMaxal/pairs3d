@@ -264,6 +264,34 @@ def main():
     label_image_count = Label(root, text="No folder selected")
     label_image_count.pack()
 
+    # --- Threshold controls ---
+    frame_thresholds = ttk.Frame(root)
+    frame_thresholds.pack(pady=5, fill="x")
+
+    # Time difference threshold
+    Label(frame_thresholds, text="Time diff (s):").pack(side="left", padx=(0, 2))
+    time_diff_var = StringVar(value=str(TIME_DIFF_THRESHOLD))
+    entry_time_diff = ttk.Entry(frame_thresholds, textvariable=time_diff_var, width=5)
+    entry_time_diff.pack(side="left", padx=(0, 10))
+
+    # Hash difference threshold
+    Label(frame_thresholds, text="Hash diff:").pack(side="left", padx=(0, 2))
+    hash_diff_var = StringVar(value=str(HASH_DIFF_THRESHOLD))
+    entry_hash_diff = ttk.Entry(frame_thresholds, textvariable=hash_diff_var, width=5)
+    entry_hash_diff.pack(side="left")
+
+    # Update thresholds before sorting
+    def update_thresholds():
+        global TIME_DIFF_THRESHOLD, HASH_DIFF_THRESHOLD
+        try:
+            TIME_DIFF_THRESHOLD = float(time_diff_var.get())
+        except Exception:
+            pass
+        try:
+            HASH_DIFF_THRESHOLD = int(hash_diff_var.get())
+        except Exception:
+            pass
+
     # Listbox and Scrollbar to show folder contents
     frame_listbox = ttk.Frame(root)
     frame_listbox.pack(fill="both", expand=True, padx=10, pady=5)
@@ -377,6 +405,7 @@ def main():
         Displays the result in the listbox and alerts completion.
         Also shows elapsed and estimated remaining time, processed count, and total count.
         """
+        update_thresholds()  # Update thresholds before starting
         folder = selected_folder["path"]
         save_last_folder(folder)
         if not folder:
