@@ -63,7 +63,7 @@ def save_last_folder(folder):
 def get_image_files(directory, recursive=False):
     """
     Retrieve a list of image file paths from the given directory (and optionally subdirectories),
-    skipping any 'pairs' or 'singles' folders.
+    skipping any '_pairs' or '_singles' folders.
 
     Args:
         directory (str): Path to the directory to search.
@@ -75,8 +75,8 @@ def get_image_files(directory, recursive=False):
     image_files = []
     if recursive:
         for root, dirs, files in os.walk(directory):
-            # Skip 'pairs' and 'singles' folders
-            dirs[:] = [d for d in dirs if d not in ("pairs", "singles")]
+            # Skip '_pairs' and '_singles' folders
+            dirs[:] = [d for d in dirs if d not in ("_pairs", "_singles")]
             for f in files:
                 if f.lower().endswith((".jpg", ".jpeg", ".png")):
                     image_files.append(os.path.join(root, f))
@@ -95,7 +95,7 @@ def get_image_files_by_folder(directory, recursive=False):
     Retrieve image files grouped by folder. When recursive is True,
     returns a dictionary mapping each folder path to its own list of image files.
 
-    Skips 'pairs' and 'singles' folders.
+    Skips '_pairs' and '_singles' folders.
 
     Args:
         directory (str): Root directory.
@@ -107,7 +107,7 @@ def get_image_files_by_folder(directory, recursive=False):
     folders = {}
     if recursive:
         for root, dirs, files in os.walk(directory):
-            dirs[:] = [d for d in dirs if d not in ("pairs", "singles")]
+            dirs[:] = [d for d in dirs if d not in ("_pairs", "_singles")]
             image_files = [
                 os.path.join(root, f)
                 for f in files
@@ -173,6 +173,10 @@ def main():
     The interface provides:
     - A label to prompt folder selection.
     - A 'Browse' button to choose a directory containing image files.
+    - A checkbox to enable processing of subfolders.
+    - A label to display the currently selected folder path.
+    - displays the contents of the selected folder in a Listbox,
+        [allow to assess whether the folder needs processing.]
     - A label to display the selected folder path.
     - A 'Start' button to commence sorting after a folder is selected.
     - A listbox to display the result counts for pairs and singles.
@@ -202,6 +206,10 @@ def main():
     )
     label_selected_folder.pack()
 
+    # Listbox to show folder contents
+    listbox_folder_contents = Listbox(root, width=60, height=8)
+    listbox_folder_contents.pack(pady=5)
+
     # Checkbox for processing subfolders
     process_subfolders_var = StringVar(value="0")
     check_subfolders = ttk.Checkbutton(
@@ -210,12 +218,35 @@ def main():
         variable=process_subfolders_var,
         onvalue="1",
         offvalue="0",
+        command=None,  # will assign after defining update function
     )
     check_subfolders.pack()
 
     # Display results
     listbox_results = Listbox(root, width=40)
     listbox_results.pack(pady=10)
+
+    def update_folder_contents_listbox():
+            """
+            Update the Listbox to show images grouped by subfolder if 'Process subfolders' is checked.
+            """
+            listbox_folder_contents.delete(0, END)
+            folder = selected_folder["path"]
+            if not folder:
+                return
+            try:
+                recursive = process_subfolders_var.get() == "1"
+                folders_dict = get_image_files_by_folder(folder, recursive=recursive)
+                for subfolder, files in sorted(folders_dict.items()):
+                    rel_subfolder = os.path.relpath(subfolder, folder)
+                    listbox_folder_contents.insert(END, f"[{rel_subfolder}]")
+                    for f in sorted(files):
+                        listbox_folder_contents.insert(END, f"    {os.path.basename(f)}")
+            except Exception as e:
+                listbox_folder_contents.insert(END, f"Error: {e}")
+
+    # Callback for the checkbox
+    check_subfolders.config(command=update_folder_contents_listbox)
 
     """
      orig, to keep progress bar separate from time\filecount:
@@ -279,6 +310,7 @@ def main():
     def browse_folder():
         """
         Handle folder selection via file dialog and update the UI.
+        Displays the contents of the selected folder in a Listbox.
         Remembers the last used folder across sessions.
         """
         initialdir = selected_folder["path"] if selected_folder["path"] else None
@@ -293,6 +325,19 @@ def main():
             label_remaining.config(text="Estimated remaining: --")
             label_processed.config(text="Processed: 0")
             label_total.config(text="Total: --")
+            update_folder_contents_listbox()  # Update listbox with folder contents
+            # Show folder contents
+            recursive = process_subfolders_var.get() == "1"
+            try:
+                folders_dict = get_image_files_by_folder(folder, recursive=recursive)
+                for subfolder, files in sorted(folders_dict.items()):
+                    # Show subfolder name (relative to root)
+                    rel_subfolder = os.path.relpath(subfolder, folder)
+                    listbox_folder_contents.insert(END, f"[{rel_subfolder}]")
+                    for f in sorted(files):
+                        listbox_folder_contents.insert(END, f"    {os.path.basename(f)}")
+            except Exception as e:
+                listbox_folder_contents.insert(END, f"Error: {e}")
 
     def start_sorting():
         """
@@ -380,7 +425,7 @@ def main():
             for pair in pairs:
                 for file in pair:
                     subdir = os.path.dirname(file)
-                    dest_dir = os.path.join(subdir, "pairs")
+                    dest_dir = os.path.join(subdir, "_pairs")
                     os.makedirs(dest_dir, exist_ok=True)
                     # shutil.move(file, os.path.join(dest_dir, os.path.basename(file)))
                     src = file
@@ -394,7 +439,7 @@ def main():
             for file in image_files:
                 if file not in used:
                     subdir = os.path.dirname(file)
-                    dest_dir = os.path.join(subdir, "singles")
+                    dest_dir = os.path.join(subdir, "_singles")
                     os.makedirs(dest_dir, exist_ok=True)
                     shutil.move(file, os.path.join(dest_dir, os.path.basename(file)))
 
