@@ -76,7 +76,10 @@ def get_image_files(directory, recursive=False):
     if recursive:
         for root, dirs, files in os.walk(directory):
             # Skip '_pairs' and '_singles' folders
-            dirs[:] = [d for d in dirs if d not in ("_pairs", "_singles")]
+            skip_folders = ["_pairs"]
+            if not include_singles:
+                skip_folders.append("_singles")
+            dirs[:] = [d for d in dirs if d not in skip_folders]
             for f in files:
                 if f.lower().endswith((".jpg", ".jpeg", ".png")):
                     image_files.append(os.path.join(root, f))
@@ -90,7 +93,7 @@ def get_image_files(directory, recursive=False):
     return image_files
 
 
-def get_image_files_by_folder(directory, recursive=False):
+def get_image_files_by_folder(directory, recursive=False, include_singles=False):
     """
     Retrieve image files grouped by folder. When recursive is True,
     returns a dictionary mapping each folder path to its own list of image files.
@@ -107,7 +110,11 @@ def get_image_files_by_folder(directory, recursive=False):
     folders = {}
     if recursive:
         for root, dirs, files in os.walk(directory):
-            dirs[:] = [d for d in dirs if d not in ("_pairs", "_singles")]
+            # Skip '_pairs' and optionally '_singles' folders
+            skip_folders = ["_pairs"]
+            if not include_singles:
+                skip_folders.append("_singles")
+            dirs[:] = [d for d in dirs if d not in skip_folders]
             image_files = [
                 os.path.join(root, f)
                 for f in files
@@ -151,6 +158,7 @@ def is_similar_image(file1, file2):
         with Image.open(file1) as img1, Image.open(file2) as img2:
             hash1 = imagehash.phash(img1)
             hash2 = imagehash.phash(img2)
+        print("HASH_DIFF_THRESHOLD used:", HASH_DIFF_THRESHOLD)  # Debug
         return abs(hash1 - hash2) < HASH_DIFF_THRESHOLD
     except Exception:
         return False
@@ -232,8 +240,11 @@ def main():
             update_folder_contents_listbox()  # Update listbox with folder contents
             # Show folder contents
             recursive = process_subfolders_var.get() == "1"
+            include_singles = reprocess_singles_var.get() == "1"
             try:
-                folders_dict = get_image_files_by_folder(folder, recursive=recursive)
+                folders_dict = get_image_files_by_folder(
+                    folder, recursive=recursive, include_singles=include_singles
+                )
                 for subfolder, files in sorted(folders_dict.items()):
                     # Show subfolder name (relative to root)
                     rel_subfolder = os.path.relpath(subfolder, folder)
@@ -273,24 +284,48 @@ def main():
     time_diff_var = StringVar(value=str(TIME_DIFF_THRESHOLD))
     entry_time_diff = ttk.Entry(frame_thresholds, textvariable=time_diff_var, width=5)
     entry_time_diff.pack(side="left", padx=(0, 10))
+    # Bind events to update threshold live
+    entry_time_diff.bind("<FocusOut>", lambda e: update_thresholds())
+    entry_time_diff.bind("<Return>", lambda e: update_thresholds())
 
     # Hash difference threshold
     Label(frame_thresholds, text="Hash diff:").pack(side="left", padx=(0, 2))
     hash_diff_var = StringVar(value=str(HASH_DIFF_THRESHOLD))
     entry_hash_diff = ttk.Entry(frame_thresholds, textvariable=hash_diff_var, width=5)
     entry_hash_diff.pack(side="left")
+    # Bind events to update threshold live
+    entry_hash_diff.bind("<FocusOut>", lambda e: update_thresholds())
+    entry_hash_diff.bind("<Return>", lambda e: update_thresholds())
 
     # Update thresholds before sorting
     def update_thresholds():
         global TIME_DIFF_THRESHOLD, HASH_DIFF_THRESHOLD
         try:
-            TIME_DIFF_THRESHOLD = float(time_diff_var.get())
-        except Exception:
-            pass
+            val = float(time_diff_var.get())
+            TIME_DIFF_THRESHOLD = max(0.01, val)
+        except Exception as e:
+            print("[Warning] Invalid time diff input, keeping previous:", e)
+
         try:
-            HASH_DIFF_THRESHOLD = int(hash_diff_var.get())
-        except Exception:
-            pass
+            val = int(hash_diff_var.get())
+            HASH_DIFF_THRESHOLD = max(1, val)
+        except Exception as e:
+            print("[Warning] Invalid hash diff input, keeping previous:", e)
+
+        print(
+            f"[Info] Using thresholds: Time = {TIME_DIFF_THRESHOLD}, Hash = {HASH_DIFF_THRESHOLD}"
+        )
+
+    # Checkbox to allow re-processing '_singles' folders
+    reprocess_singles_var = StringVar(value="0")
+    check_reprocess_singles = ttk.Checkbutton(
+        frame_thresholds,
+        text="Include '_singles' folders",
+        variable=reprocess_singles_var,
+        onvalue="1",
+        offvalue="0",
+    )
+    check_reprocess_singles.pack(side="left", padx=(10, 0))
 
     # Listbox and Scrollbar to show folder contents
     frame_listbox = ttk.Frame(root)
@@ -321,7 +356,10 @@ def main():
             return
         try:
             recursive = process_subfolders_var.get() == "1"
-            folders_dict = get_image_files_by_folder(folder, recursive=recursive)
+            include_singles = reprocess_singles_var.get() == "1"
+            folders_dict = get_image_files_by_folder(
+                folder, recursive=recursive, include_singles=include_singles
+            )
             total_images = sum(len(files) for files in folders_dict.values())
             label_image_count.config(text=f"Total images found: {total_images}")
             for subfolder, files in sorted(folders_dict.items()):
@@ -405,13 +443,6 @@ def main():
         Displays the result in the listbox and alerts completion.
         Also shows elapsed and estimated remaining time, processed count, and total count.
         """
-        update_thresholds()  # Update thresholds before starting
-        folder = selected_folder["path"]
-        save_last_folder(folder)
-        if not folder:
-            messagebox.showwarning("No Folder", "Please select a folder first.")
-            return
-
         progress["value"] = 0
         label_elapsed.config(text="Elapsed: 0s")
         label_remaining.config(text="Estimated remaining: --")
@@ -419,10 +450,21 @@ def main():
         label_total.config(text="Total: --")
         listbox_results.delete(0, END)
 
+        folder = selected_folder["path"]
+        if not folder:
+            messagebox.showerror(
+                "No folder selected", "Please select a folder before starting."
+            )
+            return
+        update_thresholds()
+
         def task():
             start_time = time.time()
+            include_singles = reprocess_singles_var.get() == "1"
             folders_dict = get_image_files_by_folder(
-                folder, recursive=(process_subfolders_var.get() == "1")
+                folder,
+                recursive=(process_subfolders_var.get() == "1"),
+                include_singles=include_singles,
             )
             image_files = [f for files in folders_dict.values() for f in files]
             total_files = len(image_files)
@@ -499,6 +541,8 @@ def main():
             for file in image_files:
                 if file not in used:
                     subdir = os.path.dirname(file)
+                    if os.path.basename(subdir) == "_singles":
+                        continue  # Already in _singles folder, do not move
                     dest_dir = os.path.join(subdir, "_singles")
                     os.makedirs(dest_dir, exist_ok=True)
                     shutil.move(file, os.path.join(dest_dir, os.path.basename(file)))
@@ -564,13 +608,16 @@ def main():
         frame_buttons,
         textvariable=pause_continue_label,
         command=pause_or_continue,
-        width=10
+        width=10,
     )
     button_pause.grid(row=0, column=3, padx=10)
 
     # Close window button (right)
     button_close = Button(
-        frame_buttons, text="Close", command=lambda: confirm_close(root, progress), width=10
+        frame_buttons,
+        text="Close",
+        command=lambda: confirm_close(root, progress),
+        width=10,
     )
     button_close.grid(row=0, column=5, padx=10)
 
@@ -579,3 +626,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# This code is designed to be run as a standalone script.

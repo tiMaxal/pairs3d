@@ -6,10 +6,10 @@ to do:
 - [done] also cause 'pause' to pause timer
 - [done] `exit` button
 - [done] process subfolders
-- allow setting values for TIME_DIFF_THRESHOLD + HASH_DIFF_THRESHOLD
+- [done] allow setting values for TIME_DIFF_THRESHOLD + HASH_DIFF_THRESHOLD
 - action 'alt' for keyboard control
-- show folder contents in 'chooser' [whether images exist there]
-- move progress bar between timer\filecount lines
+- [show folder contents in 'chooser', ie whether images exist there]
+- [done] move progress bar between timer\filecount lines
    [instead of showing info at ends of bar]
 - Cross-platform support: Windows and Linux [+ mac?]
 

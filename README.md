@@ -24,11 +24,12 @@ Detects stereo image pairs based on:
 - Moves remaining images to a singles/ folder
 - Simple GUI for folder selection
 - can process subfolders [by checkbox]
+- Time-diff and Hash values can be adjusted [for reprocessing 'singles']
 - uses settings.txt file to remember most recent folder chosen
 
 **author note**
 
- usage *may* miss some pairs, so manual perusal of the 'singles' folder is still recommended, but it *should* place only pairs into the 'pairs' folder for subsequent processing [ie, with StereoPhotoMaker or similar]
+ usage *may* miss some pairs, so manual perusal of the 'singles' folder is still recommended, but it *should* place only pairs into the 'pairs' folder for subsequent processing [ie, with StereoPhotoMaker or similar] if Hash value is not set high.
 
 License
 
