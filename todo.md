@@ -17,6 +17,8 @@ to do:
 Package as:
 - Windows .exe (standalone)
 - Debian .deb package
+build exe: 
+C:\Users\timax\AppData\Roaming\Python\Python313\Scripts\pyinstaller --onefile --windowed --hidden-import=PIL --hidden-import=imagehash --version-file=version.txt pairs3d.v1-3.py --name pairs3d
 
 [
     update readme
