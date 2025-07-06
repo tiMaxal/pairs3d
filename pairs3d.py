@@ -178,31 +178,72 @@ def confirm_close(root, progress):
 def main():
     """
     Launch the Tkinter GUI for selecting a folder and sorting stereo image pairs.
+    The color theme is loosely based on the red+cyan spectacles used to view anaglyph stereo images.
     The interface provides:
     - A label to prompt folder selection.
     - A label to display the currently selected folder path.
     - A 'Browse' button to choose a directory containing image files.
     - A checkbox to enable processing of subfolders.
-    - Displays the contents of the selected folder in a Listbox,
+    - A checkbox to allow re-processing of '_singles' folders.
+    - Displays the contents of the selected folder[s] in a Listbox,
         [allow to assess whether the folder needs processing.]
     - A 'Start' button to commence sorting after a folder is selected.
     - A progress bar that updates as image pairs are processed.
-    - Elapsed time (left), processed count (right),
-        and estimated time remaining (left, below elapsed)
-            and total file count (right, below processed) are displayed.
+    - Elapsed time [left], processed count [right],
+        and estimated time remaining [left, below elapsed]
+            and total file count [right, below processed] are displayed.
     - A 'Pause' button to suspend processing.
     - A listbox to display the result counts for pairs and singles.
-    - A 'Close' button to exit the app, with alert warning tied to unfinished progress bar.
+    - An 'Exit' button to close the app, with alert warning [tied to unfinished progress bar].
     """
     root = Tk()
     root.resizable(True, True)
     root.title("pairs3d - Stereo Image Sorter")
 
+    # Set app background color
+    root.configure(bg="lightcoral")
+    root.tk_setPalette(background="lightcoral", foreground="blue")
+
+    # Set default font for all widgets
+    default_font = ("Arial", 12, "bold")
+    root.option_add("*Font", default_font)
+    
+    # Set window size
+    root.geometry("600x800")
+    
+    # Center the window on the screen
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    x = (screen_width - 800) // 4
+    y = (screen_height - 600) // 4
+    root.geometry(f"+{x}+{y}")
+        
+    # Set minimum window size
+    #root.minsize(600, 600)
+    
+    # Set maximum window size
+    #root.maxsize(1200, 1600)
+    
+    # Set window title
+    root.title("pairs3d - Stereo Image Sorter")
+
+    # Set window background color
+    root.configure(bg="lightcoral")
+
+    # Set window icon if available
+    icon_path = os.path.join(os.path.dirname(__file__), "imgs/pairs3d.ico")
+    if os.path.exists(icon_path):
+        root.iconbitmap(icon_path)
+
+    # Set default font for all widgets
+    default_font = ("Arial", 12)
+    root.option_add("*Font", default_font)
+
     # Store selected folder path using a mutable object, initialized from settings
     selected_folder = {"path": load_last_folder()}
 
     # Prompt text
-    label = Label(root, text="Select a folder containing images to sort:")
+    label = Label(root, text="Select folder[s] containing images to sort:", bg="lightcoral", fg="blue", font=("Arial", 14, "bold"))
     label.pack(pady=10)
 
     # Display selected folder (show last folder if available)
@@ -216,6 +257,7 @@ def main():
         frame_folder,
         text=init_folder if init_folder else "No folder selected",
         fg="black" if init_folder else "gray",
+        bg="lightcoral",
     )
     label_selected_folder.pack(side="left", fill="x", expand=True)
 
@@ -230,7 +272,7 @@ def main():
         if folder:
             selected_folder["path"] = folder
             save_last_folder(folder)
-            label_selected_folder.config(text=folder, fg="black")
+            label_selected_folder.config(text=folder, fg="blue")
             listbox_results.delete(0, END)
             progress["value"] = 0
             label_elapsed.config(text="Elapsed: 0s")
@@ -242,9 +284,7 @@ def main():
             recursive = process_subfolders_var.get() == "1"
             include_singles = reprocess_singles_var.get() == "1"
             try:
-                folders_dict = get_image_files_by_folder(
-                    folder, recursive=recursive, include_singles=include_singles
-                )
+                folders_dict = get_image_files_by_folder(folder, recursive=recursive, include_singles=include_singles)
                 for subfolder, files in sorted(folders_dict.items()):
                     # Show subfolder name (relative to root)
                     rel_subfolder = os.path.relpath(subfolder, folder)
@@ -257,42 +297,96 @@ def main():
                 listbox_folder_contents.insert(END, f"Error: {e}")
 
     # Folder selection button (Browse) on the right of the label
-    button_browse = Button(frame_folder, text="Browse", command=browse_folder)
+    button_browse = Button(frame_folder, text="Browse", command=browse_folder, bg="lightblue")
     button_browse.pack(side="right", padx=5, pady=5)
+
+    # --- Folder Checkboxes: subfolders | reprocess singles ---
+    frame_folder_options = ttk.Frame(root)
+    frame_folder_options.pack(pady=5, fill="x")
+
+    # Configure columns for centering
+    frame_folder_options.columnconfigure(0, weight=1)  # left spacer
+    frame_folder_options.columnconfigure(1, weight=0)  # first checkbox
+    frame_folder_options.columnconfigure(2, weight=1)  # middle spacer
+    frame_folder_options.columnconfigure(3, weight=0)  # second checkbox
+    frame_folder_options.columnconfigure(4, weight=1)  # right spacer
+
+    # Set background for ttk.Checkbutton via style
+    style = ttk.Style()
+    frame_folder_options.configure(style="FolderOptions.TFrame")
+    style.configure("TCheckbutton", background="lightcoral")
+    style.configure("TCheckbutton", foreground="blue")
+    style.configure("TFrame", background="lightcoral")
+    style.configure("FolderOptions.TFrame", background="lightcoral")
 
     # Checkbox for processing subfolders
     process_subfolders_var = StringVar(value="0")
     check_subfolders = ttk.Checkbutton(
-        root,
+        frame_folder_options,
         text="Process subfolders",
         variable=process_subfolders_var,
         onvalue="1",
         offvalue="0",
         command=None,  # will assign after defining update function
     )
-    check_subfolders.pack()
+    check_subfolders.grid(row=0, column=1, padx=10, pady=2)
 
+    # Checkbox to allow re-processing '_singles' folders
+    reprocess_singles_var = StringVar(value="0")
+    check_reprocess_singles = ttk.Checkbutton(
+        frame_folder_options,
+        text="Include '_singles' folders",
+        variable=reprocess_singles_var,
+        onvalue="1",
+        offvalue="0"
+    )
+    check_reprocess_singles.grid(row=0, column=3, padx=10, pady=2)
+
+    # Label to show total image count
     label_image_count = Label(root, text="No folder selected")
     label_image_count.pack()
 
     # --- Threshold controls ---
     frame_thresholds = ttk.Frame(root)
     frame_thresholds.pack(pady=5, fill="x")
+    frame_thresholds.configure(style="Thresholds.TFrame")
+    style.configure("Thresholds.TFrame", background="lightcoral")
+    
+    # Configure columns for centering
+    frame_thresholds.columnconfigure(0, weight=1)  # left spacer
+    frame_thresholds.columnconfigure(1, weight=0)  # label: Time diff
+    frame_thresholds.columnconfigure(2, weight=0)  # entry: Time diff
+    frame_thresholds.columnconfigure(3, weight=1)  # middle spacer
+    frame_thresholds.columnconfigure(4, weight=0)  # label: Hash diff
+    frame_thresholds.columnconfigure(5, weight=0)  # entry: Hash diff
+    frame_thresholds.columnconfigure(6, weight=1)  # right spacer
 
     # Time difference threshold
-    Label(frame_thresholds, text="Time diff (s):").pack(side="left", padx=(0, 2))
+    Label(
+        frame_thresholds,
+        text="Time diff (s):",
+        font=("Arial", 12, "bold")).grid(row=0, column=1, padx=(0,2), pady=2, sticky="e"
+        )
     time_diff_var = StringVar(value=str(TIME_DIFF_THRESHOLD))
     entry_time_diff = ttk.Entry(frame_thresholds, textvariable=time_diff_var, width=5)
-    entry_time_diff.pack(side="left", padx=(0, 10))
+    entry_time_diff.grid(row=0, column=2, padx=(0, 10), pady=2, sticky="w")
+    entry_time_diff.configure(background="lightblue",foreground="blue")
+
     # Bind events to update threshold live
     entry_time_diff.bind("<FocusOut>", lambda e: update_thresholds())
     entry_time_diff.bind("<Return>", lambda e: update_thresholds())
 
     # Hash difference threshold
-    Label(frame_thresholds, text="Hash diff:").pack(side="left", padx=(0, 2))
+    Label(
+        frame_thresholds,
+        text="Hash diff:",
+        font=("Arial", 12, "bold")).grid(row=0, column=4, padx=(0,2), pady=2, sticky="e"
+)
     hash_diff_var = StringVar(value=str(HASH_DIFF_THRESHOLD))
     entry_hash_diff = ttk.Entry(frame_thresholds, textvariable=hash_diff_var, width=5)
-    entry_hash_diff.pack(side="left")
+    entry_hash_diff.grid(row=0, column=5, padx=(0,0), pady=2, sticky="w")
+    entry_hash_diff.configure(background="lightblue", foreground="blue")
+
     # Bind events to update threshold live
     entry_hash_diff.bind("<FocusOut>", lambda e: update_thresholds())
     entry_hash_diff.bind("<Return>", lambda e: update_thresholds())
@@ -312,26 +406,13 @@ def main():
         except Exception as e:
             print("[Warning] Invalid hash diff input, keeping previous:", e)
 
-        print(
-            f"[Info] Using thresholds: Time = {TIME_DIFF_THRESHOLD}, Hash = {HASH_DIFF_THRESHOLD}"
-        )
-
-    # Checkbox to allow re-processing '_singles' folders
-    reprocess_singles_var = StringVar(value="0")
-    check_reprocess_singles = ttk.Checkbutton(
-        frame_thresholds,
-        text="Include '_singles' folders",
-        variable=reprocess_singles_var,
-        onvalue="1",
-        offvalue="0",
-    )
-    check_reprocess_singles.pack(side="left", padx=(10, 0))
+        print(f"[Info] Using thresholds: Time = {TIME_DIFF_THRESHOLD}, Hash = {HASH_DIFF_THRESHOLD}")
 
     # Listbox and Scrollbar to show folder contents
     frame_listbox = ttk.Frame(root)
     frame_listbox.pack(fill="both", expand=True, padx=10, pady=5)
 
-    listbox_folder_contents = Listbox(frame_listbox, width=80, height=18)
+    listbox_folder_contents = Listbox(frame_listbox, width=80, height=18, bg="lightblue", fg="blue")
     listbox_folder_contents.pack(side="left", fill="both", expand=True)
 
     scrollbar_folder = ttk.Scrollbar(
@@ -342,7 +423,7 @@ def main():
     listbox_folder_contents.config(yscrollcommand=scrollbar_folder.set)
 
     # Display results
-    listbox_results = Listbox(root, width=30, height=3)
+    listbox_results = Listbox(root, width=30, height=3, bg="lightblue", fg="blue")
     listbox_results.pack(pady=10)
 
     # Function to update the Listbox with folder contents
@@ -357,9 +438,7 @@ def main():
         try:
             recursive = process_subfolders_var.get() == "1"
             include_singles = reprocess_singles_var.get() == "1"
-            folders_dict = get_image_files_by_folder(
-                folder, recursive=recursive, include_singles=include_singles
-            )
+            folders_dict = get_image_files_by_folder(folder, recursive=recursive, include_singles=include_singles)
             total_images = sum(len(files) for files in folders_dict.values())
             label_image_count.config(text=f"Total images found: {total_images}")
             for subfolder, files in sorted(folders_dict.items()):
@@ -374,32 +453,33 @@ def main():
     # Callback for the checkbox
     check_subfolders.config(command=update_folder_contents_listbox)
 
-    """
-     orig, to keep progress bar separate from time\filecount:
-    progress = ttk.Progressbar(root, orient="horizontal", length=300, mode="determinate")
-    progress.pack(pady=5)
-    """
     # --- Progress bar and info frame ---
     frame_progress = ttk.Frame(root)
     frame_progress.pack(pady=5, fill="x")
+    frame_progress.configure(style="Progress.TFrame")
+    style.configure("Progress.TFrame", background="lightcoral")
 
     # Elapsed/remaining on left, processed/total on right
     frame_labels = ttk.Frame(frame_progress)
     frame_labels.pack(fill="x")  # Place labels in a row
+    frame_labels.configure(style="Labels.TFrame")
+    style.configure("Labels.TFrame", background="lightcoral", foreground="blue")
 
     frame_left = ttk.Frame(frame_labels)
     frame_left.pack(side="left", anchor="w")
+    frame_left.configure(style="Labels.TFrame")
     frame_right = ttk.Frame(frame_labels)
     frame_right.pack(side="right", anchor="e")
+    frame_right.configure(style="Labels.TFrame")
 
-    label_elapsed = Label(frame_left, text="Elapsed: 0s")
+    label_elapsed = Label(frame_left, text="Elapsed: 0s", bg="lightcoral", fg="blue", font=("Arial", 12, "bold"))
     label_elapsed.pack(anchor="w")
-    label_remaining = Label(frame_left, text="Estimated remaining: --")
+    label_remaining = Label(frame_left, text="Estimated remaining: --", bg="lightcoral", fg="blue", font=("Arial", 12, "bold"))
     label_remaining.pack(anchor="w")
 
-    label_processed = Label(frame_right, text="Processed: 0")
+    label_processed = Label(frame_right, text="Processed: 0", bg="lightcoral", fg="blue", font=("Arial", 12, "bold"))
     label_processed.pack(anchor="e")
-    label_total = Label(frame_right, text="Total: --")
+    label_total = Label(frame_right, text="Total: --", bg="lightcoral", fg="blue", font=("Arial", 12, "bold"))
     label_total.pack(anchor="e")
 
     progress = ttk.Progressbar(
@@ -435,7 +515,7 @@ def main():
         if total is not None:
             label_total.config(text=f"Total: {total}")
         root.update_idletasks()
-
+    
     def start_sorting():
         """
         Perform image sorting using the selected folder.
@@ -452,19 +532,16 @@ def main():
 
         folder = selected_folder["path"]
         if not folder:
-            messagebox.showerror(
-                "No folder selected", "Please select a folder before starting."
-            )
+            messagebox.showerror("No folder selected", "Please select a folder before starting.")
             return
         update_thresholds()
-
+        
         def task():
             start_time = time.time()
             include_singles = reprocess_singles_var.get() == "1"
             folders_dict = get_image_files_by_folder(
-                folder,
-                recursive=(process_subfolders_var.get() == "1"),
-                include_singles=include_singles,
+                folder, recursive=(process_subfolders_var.get() == "1"),
+                include_singles=include_singles
             )
             image_files = [f for files in folders_dict.values() for f in files]
             total_files = len(image_files)
@@ -569,6 +646,8 @@ def main():
     # --- Button row: Start | Pause | Close ---
     frame_buttons = ttk.Frame(root)
     frame_buttons.pack(fill="x", pady=10)
+    frame_buttons.configure(style="Buttons.TFrame")
+    style.configure("Buttons.TFrame", background="lightcoral")
 
     # Configure columns: spacers expand, buttons fixed
     frame_buttons.columnconfigure(0, weight=1)  # left spacer
@@ -579,11 +658,19 @@ def main():
     frame_buttons.columnconfigure(5, weight=0)  # right button
     frame_buttons.columnconfigure(6, weight=1)  # right spacer
 
-    # Start sorting button (left)
-    button_start = Button(frame_buttons, text="Start", command=start_sorting, width=10)
+    # Start sorting button (left, green)
+    button_start = Button(
+        frame_buttons,
+        text="Start",
+        command=start_sorting,
+        width=7,
+        bg="limegreen",
+        activebackground="green2",
+        font=("Arial", 12, "bold")
+    )
     button_start.grid(row=0, column=1, padx=10)
 
-    # Pause/Continue button (center)
+    # Pause/Continue button (center, yellow)
     pause_event = threading.Event()
     pause_event.set()  # Start unpaused
     pause_continue_label = StringVar(value="Pause")
@@ -609,15 +696,21 @@ def main():
         textvariable=pause_continue_label,
         command=pause_or_continue,
         width=10,
+        bg="gold",
+        activebackground="yellow",
+        font=("Arial", 12, "bold"),
     )
     button_pause.grid(row=0, column=3, padx=10)
 
-    # Close window button (right)
+    # Close window button (right, red)
     button_close = Button(
         frame_buttons,
-        text="Close",
+        text="EXIT",
         command=lambda: confirm_close(root, progress),
-        width=10,
+        width=7,
+        bg="red",
+        activebackground="darkred",
+        font=("Arial", 12, "bold"),
     )
     button_close.grid(row=0, column=5, padx=10)
 

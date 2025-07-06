@@ -7,11 +7,11 @@
   Stereo Image Pair Sorter
 
  
- move stereo "cha-cha" pairs, and single images, from one folder into separate folders
+ to move stereo "cha-cha" pairs, and single images, from one folder into separate folders
  
  
 `pairs3d` is a basic python GUI tool that automatically identifies and separates stereo image pairs from folders containing both stereo pairs and single images. It uses perceptual hashing and timestamp proximity to detect stereo pairs and organizes them into separate pair/single folders for easy management.
-  
+  The theme colors are loosely based on the red+cyan spectacles used to view anaglyph stereo images.
  [created by chatgpt vibe-code]
  
  
