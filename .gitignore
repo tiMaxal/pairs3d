@@ -37,3 +37,6 @@ Thumbs.db
 
 # todo
 # todo.md
+# testing
+*.test.py
+settings.txt
