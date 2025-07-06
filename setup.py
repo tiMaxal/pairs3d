@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as f:
     
 setup(
     name='pairs3d',
-    version='1.2.0',
+    version='1.3.0',
     description='Stereo image pair sorter using timestamp and perceptual similarity',
     long_description=long_description,
     long_description_content_type="text/markdown",
