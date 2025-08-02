@@ -12,6 +12,7 @@ to do:
 - [done] move progress bar between timer\filecount lines
    [instead of showing info at ends of bar]
 - Cross-platform support: Windows and Linux [+ mac?]
+- cli functionality 
 
 
 Package as:
